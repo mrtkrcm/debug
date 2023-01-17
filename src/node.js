@@ -2,34 +2,31 @@
  * Module dependencies.
  */
 
-const tty = require('tty');
-const util = require('util');
+const tty = require('tty')
+const util = require('util')
 
 /**
  * This is the Node.js implementation of `debug()`.
  */
 
-exports.init = init;
-exports.log = log;
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.destroy = util.deprecate(
-	() => {},
-	'Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.'
-);
+exports.init = init
+exports.log = log
+exports.applyColor = applyColor
+exports.save = save
+exports.load = load
+exports.useColors = useColors
+exports.getFormat = getFormat
 
 /**
  * Colors.
  */
 
-exports.colors = [6, 2, 3, 4, 5, 1];
+exports.colors = [6, 2, 3, 4, 5, 1]
 
 try {
 	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
 	// eslint-disable-next-line import/no-extraneous-dependencies
-	const supportsColor = require('supports-color');
+	const supportsColor = require('supports-color')
 
 	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
 		exports.colors = [
@@ -109,7 +106,7 @@ try {
 			215,
 			220,
 			221
-		];
+		]
 	}
 } catch (error) {
 	// Swallow - we only care if `supports-color` is available; it doesn't have to be.
@@ -121,41 +118,70 @@ try {
  *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
  */
 
-exports.inspectOpts = Object.keys(process.env).filter(key => {
-	return /^debug_/i.test(key);
-}).reduce((obj, key) => {
-	// Camel-case
-	const prop = key
-		.substring(6)
-		.toLowerCase()
-		.replace(/_([a-z])/g, (_, k) => {
-			return k.toUpperCase();
-		});
+exports.inspectOpts = Object.keys(process.env)
+	.filter(key => {
+		return /^debug_/i.test(key)
+	})
+	.reduce((obj, key) => {
+		// Camel-case
+		const prop = key
+			.substring(6)
+			.toLowerCase()
+			.replace(/_([a-z])/g, (_, k) => {
+				return k.toUpperCase()
+			})
 
-	// Coerce string value into JS value
-	let val = process.env[key];
-	if (/^(yes|on|true|enabled)$/i.test(val)) {
-		val = true;
-	} else if (/^(no|off|false|disabled)$/i.test(val)) {
-		val = false;
-	} else if (val === 'null') {
-		val = null;
-	} else {
-		val = Number(val);
-	}
+		// Coerce string value into JS value
+		let val = process.env[key]
+		if (/^(yes|on|true|enabled)$/i.test(val)) {
+			val = true
+		} else if (/^(no|off|false|disabled)$/i.test(val)) {
+			val = false
+		} else if (val === 'null') {
+			val = null
+		} else {
+			const asNumber = Number(val)
+			if (!isNaN(asNumber)) {
+				val = asNumber
+			}
+		}
 
-	obj[prop] = val;
-	return obj;
-}, {});
+		obj[prop] = val
+		return obj
+	}, {})
 
 /**
  * Is stdout a TTY? Colored output is enabled when `true`.
  */
 
 function useColors() {
-	return 'colors' in exports.inspectOpts ?
-		Boolean(exports.inspectOpts.colors) :
-		tty.isatty(process.stderr.fd);
+	return 'colors' in exports.inspectOpts
+		? Boolean(exports.inspectOpts.colors)
+		: tty.isatty(process.stderr.fd)
+}
+
+/**
+ * If DEBUG_FORMAT if specified, returns it.
+ * Otherwise, returns a format matching previous version's based on DEBUG_COLORS and DEBUG_HIDE_DATE
+ */
+
+function getFormat() {
+	const useColors =
+		'colors' in exports.inspectOpts
+			? Boolean(exports.inspectOpts.colors)
+			: tty.isatty(process.stderr.fd)
+
+	if ('format' in exports.inspectOpts) {
+		return exports.inspectOpts.format
+	} else {
+		if (useColors) {
+			return ' %Cn%m%c+' // '  %n %m %+'
+		} else if (exports.inspectOpts.hideDate) {
+			return '%n%m' // '%n %m'
+		} else {
+			return '%{%FT%T.%LZ%M-Z}%n%m' // '%{%FT%T.%LZ%M-Z} %n %m'
+		}
+	}
 }
 
 /**
@@ -164,26 +190,12 @@ function useColors() {
  * @api public
  */
 
-function formatArgs(args) {
-	const {namespace: name, useColors} = this;
+function applyColor(str, bold = false) {
+	// I think doing this each time is a waste, colorCode could be stored in some variable?
+	const c = this.color
+	const colorCode = '\u001B[3' + (c < 8 ? c : '8;5;' + c)
 
-	if (useColors) {
-		const c = this.color;
-		const colorCode = '\u001B[3' + (c < 8 ? c : '8;5;' + c);
-		const prefix = `  ${colorCode};1m${name} \u001B[0m`;
-
-		args[0] = prefix + args[0].split('\n').join('\n' + prefix);
-		args.push(colorCode + 'm+' + module.exports.humanize(this.diff) + '\u001B[0m');
-	} else {
-		args[0] = getDate() + name + ' ' + args[0];
-	}
-}
-
-function getDate() {
-	if (exports.inspectOpts.hideDate) {
-		return '';
-	}
-	return new Date().toISOString() + ' ';
+	return colorCode + (bold ? ';1' : '') + 'm' + str + '\u001B[0m'
 }
 
 /**
@@ -191,7 +203,7 @@ function getDate() {
  */
 
 function log(...args) {
-	return process.stderr.write(util.format(...args) + '\n');
+	return process.stderr.write(util.format(...args) + '\n')
 }
 
 /**
@@ -202,11 +214,11 @@ function log(...args) {
  */
 function save(namespaces) {
 	if (namespaces) {
-		process.env.DEBUG = namespaces;
+		process.env.DEBUG = namespaces
 	} else {
 		// If you set a process.env field to null or undefined, it gets cast to the
 		// string 'null' or 'undefined'. Just delete instead.
-		delete process.env.DEBUG;
+		delete process.env.DEBUG
 	}
 }
 
@@ -218,7 +230,7 @@ function save(namespaces) {
  */
 
 function load() {
-	return process.env.DEBUG;
+	return process.env.DEBUG
 }
 
 /**
@@ -229,35 +241,36 @@ function load() {
  */
 
 function init(debug) {
-	debug.inspectOpts = {};
+	debug.inspectOpts = {}
 
-	const keys = Object.keys(exports.inspectOpts);
+	const keys = Object.keys(exports.inspectOpts)
 	for (let i = 0; i < keys.length; i++) {
-		debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+		debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]]
 	}
 }
 
-module.exports = require('./common')(exports);
+module.exports = require('./common')(exports)
 
-const {formatters} = module.exports;
+const { formatters } = module.exports
 
 /**
  * Map %o to `util.inspect()`, all on a single line.
  */
 
-formatters.o = function (v) {
-	this.inspectOpts.colors = this.useColors;
-	return util.inspect(v, this.inspectOpts)
+formatters.o = function(v) {
+	this.inspectOpts.colors = this.useColors
+	return util
+		.inspect(v, this.inspectOpts)
 		.split('\n')
 		.map(str => str.trim())
-		.join(' ');
-};
+		.join(' ')
+}
 
 /**
  * Map %O to `util.inspect()`, allowing multiple lines if needed.
  */
 
-formatters.O = function (v) {
-	this.inspectOpts.colors = this.useColors;
-	return util.inspect(v, this.inspectOpts);
-};
+formatters.O = function(v) {
+	this.inspectOpts.colors = this.useColors
+	return util.inspect(v, this.inspectOpts)
+}

@@ -11,7 +11,6 @@ function setup(env) {
 	createDebug.enable = enable
 	createDebug.enabled = enabled
 	createDebug.humanize = require('ms')
-	createDebug.destroy = destroy
 
 	Object.keys(env).forEach(key => {
 		createDebug[key] = env[key]
@@ -172,7 +171,7 @@ function setup(env) {
 	 * @return {Function}
 	 * @api public
 	 */
-	function createDebug(namespace) {
+	function createDebug(namespace, opts = {}) {
 		let prevTime
 		let enableOverride = null
 		let namespacesCache
@@ -269,7 +268,9 @@ function setup(env) {
 			})
 
 			// Apply env-specific formatting (colors, etc.)
-			createDebug.formatArgs.call(self, args)
+			if (typeof createDebug.formatArgs === 'function') {
+				createDebug.formatArgs.call(self, args)
+			}
 
 			const logFn = self.log || createDebug.log
 			logFn.apply(self, formattedArgs)
@@ -277,12 +278,27 @@ function setup(env) {
 
 		debug.namespace = namespace
 		debug.useColors = createDebug.useColors()
-		debug.format = createDebug.getFormat() || '%{H:M-Z}%n%m%+' // '  %n%m%+'
 		debug.color = selectColor(namespace)
 		debug.applyColor = createDebug.applyColor.bind(debug)
-		debug.destroy = destroy
 		debug.extend = extend
-		debug.destroy = createDebug.destroy // XXX Temporary. Will be removed in the next major release.
+
+		function getFormat() {
+			if("getFormat" in createDebug){
+				return createDebug.getFormat();
+			}
+			if ('format' in opts) {
+				return opts.format
+			} else {
+				if (debug.useColors) {
+					return ' %Cn%m%c+' // '  %n %m %+'
+				} else if ('hideDate' in opts && opts.hideDate === true) {
+					return '%n%m' // '%n %m'
+				} else {
+					return '%{%FT%T.%LZ%M-Z}%n%m' // '%{%FT%T.%LZ%M-Z} %n %m'
+				}
+			}
+		}
+		debug.format = getFormat()
 
 		Object.defineProperty(debug, 'enabled', {
 			enumerable: true,
@@ -432,16 +448,6 @@ function setup(env) {
 			return val.stack || val.message
 		}
 		return val
-	}
-
-	/**
-	 * XXX DO NOT USE. This is a temporary stub function.
-	 * XXX It WILL be removed in the next major release.
-	 */
-	function destroy() {
-		console.warn(
-			'Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.'
-		)
 	}
 
 	createDebug.enable(createDebug.load())

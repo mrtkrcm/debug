@@ -5,6 +5,7 @@
  */
 
 exports.formatArgs = formatArgs;
+exports.applyColor = applyColor;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
@@ -126,6 +127,18 @@ function useColors() {
 		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
 		// Double check webkit in userAgent just in case we are in a worker
 		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+}
+
+/**
+ * Adds color codes if enabled.
+ *
+ * @api public
+ */
+
+function applyColor(str, bold = false) {
+	// I think doing this each time is a waste, colorCode could be stored in some variable?
+	// const color = this.color
+	return str;
 }
 
 /**

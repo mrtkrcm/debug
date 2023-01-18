@@ -327,12 +327,14 @@ function setup(env) {
 		return debug
 	}
 
-	function extend(namespace, delimiter) {
+	function extend(namespace, delimiter, opts) {
 		const newDebug = createDebug(
 			this.namespace +
 				(typeof delimiter === 'undefined' ? ':' : delimiter) +
-				namespace
+				namespace,
+			opts
 		)
+		newDebug.format = this.format
 		newDebug.log = this.log
 		return newDebug
 	}
